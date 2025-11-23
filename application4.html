@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Management Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    html {
+      height: 100%;
+    }
+    .event-card {
+      transition: all 0.3s ease;
+      height: 100%;
+    }
+    .event-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+    .progress-bar {
+      transition: width 0.5s ease;
+    }
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .loading-spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .category-conference { background: #dbeafe; color: #1e40af; }
+    .category-workshop { background: #fce7f3; color: #be185d; }
+    .category-seminar { background: #dcfce7; color: #15803d; }
+    .category-meetup { background: #fef3c7; color: #a16207; }
+    .category-webinar { background: #e0e7ff; color: #4338ca; }
+    .category-other { background: #f3e8ff; color: #7c3aed; }
+    .stat-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+      transition: all 0.3s;
+    }
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+    }
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      z-index: 9999;
+      animation: slideIn 0.3s ease-out;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .toast-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .toast-error { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+    .modal-backdrop {
+      backdrop-filter: blur(4px);
+    }
+    .capacity-full { color: #ef4444; }
+    .capacity-high { color: #f59e0b; }
+    .capacity-medium { color: #3b82f6; }
+    .capacity-low { color: #10b981; }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+  <div class="min-h-screen"><!-- Header -->
+   <header class="bg-white shadow-lg border-b-4 border-gradient-to-r from-purple-500 to-pink-500">
+    <div class="max-w-7xl mx-auto px-6 py-6">
+     <div class="flex justify-between items-center">
+      <div>
+       <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">Event Management Dashboard</h1>
+       <p class="text-gray-600 text-sm mt-2">Manage and track all your events in one place</p>
+      </div>
+      <div class="flex gap-3"><button id="refreshBtn" class="bg-white border-2 border-purple-200 text-purple-600 px-5 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg> Refresh </button> <button id="createEventBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg transition-all flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        </svg> Create New Event </button>
+      </div>
+     </div>
+    </div>
+   </header><!-- Main Content -->
+   <main class="max-w-7xl mx-auto px-6 py-8"><!-- Statistics Dashboard -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 fade-in">
+     <div class="stat-card border-l-4 border-purple-500">
+      <div class="flex items-center justify-between mb-2">
+       <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+        Total Events
+       </div>
+       <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+       </div>
+      </div>
+      <div id="totalEvents" class="text-4xl font-bold text-gray-800">
+       0
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+       Active events
+      </div>
+     </div>
+     <div class="stat-card border-l-4 border-blue-500">
+      <div class="flex items-center justify-between mb-2">
+       <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+        Registrations
+       </div>
+       <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+       </div>
+      </div>
+      <div id="totalRegistrations" class="text-4xl font-bold text-gray-800">
+       0
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+       Total attendees
+      </div>
+     </div>
+     <div class="stat-card border-l-4 border-green-500">
+      <div class="flex items-center justify-between mb-2">
+       <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+        Available Seats
+       </div>
+       <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+       </div>
+      </div>
+      <div id="availableSeats" class="text-4xl font-bold text-gray-800">
+       0
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+       Seats remaining
+      </div>
+     </div>
+     <div class="stat-card border-l-4 border-pink-500">
+      <div class="flex items-center justify-between mb-2">
+       <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+        Capacity Rate
+       </div>
+       <div class="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+        <svg class="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+       </div>
+      </div>
+      <div id="capacityRate" class="text-4xl font-bold text-gray-800">
+       0%
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+       Average fill rate
+      </div>
+     </div>
+    </div><!-- Search and Filter -->
+    <div class="bg-white rounded-xl shadow-md p-6 mb-8 fade-in">
+     <div class="flex flex-col md:flex-row gap-4">
+      <div class="flex-1"><label for="searchEvents" class="block text-sm font-semibold text-gray-700 mb-2">Search Events</label> <input type="text" id="searchEvents" placeholder="Search by title, location, or category..." class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+      </div>
+      <div class="md:w-48"><label for="filterCategory" class="block text-sm font-semibold text-gray-700 mb-2">Filter by Category</label> <select id="filterCategory" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"> <option value="">All Categories</option> <option value="Conference">Conference</option> <option value="Workshop">Workshop</option> <option value="Seminar">Seminar</option> <option value="Meetup">Meetup</option> <option value="Webinar">Webinar</option> <option value="Other">Other</option> </select>
+      </div>
+     </div>
+    </div><!-- Events Grid -->
+    <div id="eventsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in"><!-- Events will be rendered here -->
+    </div><!-- Empty State -->
+    <div id="emptyState" class="text-center py-20 fade-in">
+     <div class="w-32 h-32 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <svg class="w-16 h-16 text-purple-400" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+      </svg>
+     </div>
+     <h3 class="text-2xl font-bold text-gray-700 mb-3">No Events Found</h3>
+     <p class="text-gray-500 mb-6">Create your first event to get started with event management!</p><button onclick="document.getElementById('createEventBtn').click()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg transition-all"> Create Your First Event </button>
+    </div>
+   </main>
+  </div><!-- Event Form Modal -->
+  <div id="eventModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden items-center justify-center p-4 z-50">
+   <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto fade-in">
+    <div class="bg-gradient-to-r from-purple-600 to-pink-600 p-6 rounded-t-2xl">
+     <div class="flex justify-between items-center">
+      <h2 id="modalTitle" class="text-2xl font-bold text-white">Create New Event</h2><button id="closeModal" class="text-white hover:text-gray-200 transition-colors">
+       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+       </svg></button>
+     </div>
+    </div>
+    <form id="eventForm" class="p-6 space-y-5">
+     <div><label for="eventTitle" class="block text-sm font-bold text-gray-700 mb-2">Event Title *</label> <input type="text" id="eventTitle" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" placeholder="Enter event title">
+     </div>
+     <div><label for="eventDescription" class="block text-sm font-bold text-gray-700 mb-2">Description *</label> <textarea id="eventDescription" required rows="4" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" placeholder="Describe your event"></textarea>
+     </div>
+     <div class="grid grid-cols-2 gap-4">
+      <div><label for="eventDate" class="block text-sm font-bold text-gray-700 mb-2">Date *</label> <input type="date" id="eventDate" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+      </div>
+      <div><label for="eventCategory" class="block text-sm font-bold text-gray-700 mb-2">Category *</label> <select id="eventCategory" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"> <option value="">Select category</option> <option value="Conference">Conference</option> <option value="Workshop">Workshop</option> <option value="Seminar">Seminar</option> <option value="Meetup">Meetup</option> <option value="Webinar">Webinar</option> <option value="Other">Other</option> </select>
+      </div>
+     </div>
+     <div class="grid grid-cols-2 gap-4">
+      <div><label for="eventStartTime" class="block text-sm font-bold text-gray-700 mb-2">Start Time *</label> <input type="time" id="eventStartTime" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+      </div>
+      <div><label for="eventEndTime" class="block text-sm font-bold text-gray-700 mb-2">End Time *</label> <input type="time" id="eventEndTime" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
+      </div>
+     </div>
+     <div><label for="eventLocation" class="block text-sm font-bold text-gray-700 mb-2">Location *</label> <input type="text" id="eventLocation" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" placeholder="Event venue or online link">
+     </div>
+     <div><label for="eventCapacity" class="block text-sm font-bold text-gray-700 mb-2">Capacity *</label> <input type="number" id="eventCapacity" required min="1" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" placeholder="Maximum attendees">
+     </div>
+     <div class="flex gap-3 pt-4"><button type="submit" id="submitBtn" class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-lg font-bold transition-all shadow-lg"> Save Event </button> <button type="button" id="cancelBtn" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-all"> Cancel </button>
+     </div>
+    </form>
+   </div>
+  </div><!-- Registration Modal -->
+  <div id="registrationModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden items-center justify-center p-4 z-50">
+   <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto fade-in">
+    <div class="bg-gradient-to-r from-green-600 to-emerald-600 p-6 rounded-t-2xl">
+     <div class="flex justify-between items-center">
+      <h2 id="registrationModalTitle" class="text-2xl font-bold text-white">Register for Event</h2><button id="closeRegistrationModal" class="text-white hover:text-gray-200 transition-colors">
+       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+       </svg></button>
+     </div>
+    </div>
+    <form id="registrationForm" class="p-6 space-y-5">
+     <div id="eventInfoBox" class="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border-2 border-purple-200">
+      <h3 id="regEventTitle" class="font-bold text-lg text-purple-900 mb-2"></h3>
+      <div class="text-sm text-purple-700 space-y-1">
+       <p id="regEventDate"></p>
+       <p id="regEventLocation"></p>
+      </div>
+     </div>
+     <div><label for="attendeeName" class="block text-sm font-bold text-gray-700 mb-2">Full Name *</label> <input type="text" id="attendeeName" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" placeholder="Enter your full name">
+     </div>
+     <div><label for="attendeeEmail" class="block text-sm font-bold text-gray-700 mb-2">Email Address *</label> <input type="email" id="attendeeEmail" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" placeholder="your.email@example.com">
+     </div>
+     <div><label for="attendeePhone" class="block text-sm font-bold text-gray-700 mb-2">Phone Number *</label> <input type="tel" id="attendeePhone" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" placeholder="+1 (555) 123-4567">
+     </div>
+     <div><label for="ticketType" class="block text-sm font-bold text-gray-700 mb-2">Ticket Type *</label> <select id="ticketType" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"> <option value="">Select ticket type</option> <option value="general">General Admission</option> <option value="vip">VIP Pass</option> <option value="student">Student Discount</option> </select>
+     </div>
+     <div class="flex gap-3 pt-4"><button type="submit" id="submitRegistrationBtn" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg font-bold transition-all shadow-lg"> Complete Registration </button> <button type="button" id="cancelRegistrationBtn" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-all"> Cancel </button>
+     </div>
+    </form>
+   </div>
+  </div><!-- Attendees Modal -->
+  <div id="attendeesModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden items-center justify-center p-4 z-50">
+   <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto fade-in">
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-2xl">
+     <div class="flex justify-between items-center">
+      <h2 id="attendeesModalTitle" class="text-2xl font-bold text-white">Event Attendees</h2><button id="closeAttendeesModal" class="text-white hover:text-gray-200 transition-colors">
+       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+       </svg></button>
+     </div>
+    </div>
+    <div id="attendeesList" class="p-6"><!-- Attendees will be rendered here -->
+    </div>
+   </div>
+  </div>
+  <script>
+    // LocalStorage-based data management
+    const STORAGE_KEY = 'eventManagementData';
+    
+    let allRecords = [];
+    let editingEventId = null;
+
+    // Load data from localStorage
+    function loadData() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          allRecords = JSON.parse(stored);
+        } catch (e) {
+          allRecords = [];
+        }
+      }
+      renderDashboard();
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allRecords));
+      renderDashboard();
+    }
+
+    function getEvents() {
+      return allRecords.filter(r => r.type === 'event');
+    }
+
+    function getRegistrations() {
+      return allRecords.filter(r => r.type === 'registration');
+    }
+
+    function renderDashboard() {
+      const events = getEvents();
+      const registrations = getRegistrations();
+      
+      updateStats(events, registrations);
+      renderEventsGrid(events, registrations);
+    }
+
+    function updateStats(events, registrations) {
+      const totalEvents = events.length;
+      const totalRegistrations = registrations.length;
+      const availableSeats = events.reduce((sum, e) => sum + (e.capacity - e.registered), 0);
+      
+      const totalCapacity = events.reduce((sum, e) => sum + e.capacity, 0);
+      const capacityRate = totalCapacity > 0 ? Math.round((totalRegistrations / totalCapacity) * 100) : 0;
+
+      document.getElementById('totalEvents').textContent = totalEvents;
+      document.getElementById('totalRegistrations').textContent = totalRegistrations;
+      document.getElementById('availableSeats').textContent = availableSeats;
+      document.getElementById('capacityRate').textContent = capacityRate + '%';
+    }
+
+    function renderEventsGrid(events, registrations) {
+      const grid = document.getElementById('eventsGrid');
+      const emptyState = document.getElementById('emptyState');
+      const searchTerm = document.getElementById('searchEvents').value.toLowerCase();
+      const categoryFilter = document.getElementById('filterCategory').value;
+
+      let filteredEvents = events.filter(e => {
+        const matchesSearch = e.title.toLowerCase().includes(searchTerm) || 
+                            e.location.toLowerCase().includes(searchTerm) ||
+                            e.category.toLowerCase().includes(searchTerm);
+        const matchesCategory = !categoryFilter || e.category === categoryFilter;
+        return matchesSearch && matchesCategory;
+      });
+
+      if (filteredEvents.length === 0) {
+        grid.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      grid.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+
+      grid.innerHTML = filteredEvents.map(event => {
+        const eventDate = new Date(event.date);
+        const formattedDate = eventDate.toLocaleDateString('en-US', { 
+          weekday: 'short',
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        });
+        
+        const isFull = event.registered >= event.capacity;
+        const fillPercentage = (event.registered / event.capacity) * 100;
+        const eventRegistrations = registrations.filter(r => r.eventId === event.id);
+        
+        let capacityClass = 'capacity-low';
+        if (fillPercentage >= 100) capacityClass = 'capacity-full';
+        else if (fillPercentage >= 80) capacityClass = 'capacity-high';
+        else if (fillPercentage >= 50) capacityClass = 'capacity-medium';
+
+        return '<div class="event-card bg-white rounded-xl shadow-lg overflow-hidden">' +
+          '<div class="bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 p-5">' +
+            '<div class="flex justify-between items-start mb-3">' +
+              '<span class="badge category-' + event.category.toLowerCase() + '">' + event.category + '</span>' +
+              (isFull ? '<span class="badge" style="background: #fee2e2; color: #991b1b;">SOLD OUT</span>' : '') +
+            '</div>' +
+            '<h3 class="text-xl font-bold text-white mb-2">' + event.title + '</h3>' +
+            '<p class="text-purple-100 text-sm line-clamp-2">' + event.description + '</p>' +
+          '</div>' +
+          '<div class="p-5">' +
+            '<div class="space-y-3 mb-4">' +
+              '<div class="flex items-center text-sm text-gray-700">' +
+                '<svg class="w-5 h-5 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>' +
+                '</svg>' +
+                '<span class="font-semibold">' + formattedDate + '</span>' +
+              '</div>' +
+              '<div class="flex items-center text-sm text-gray-700">' +
+                '<svg class="w-5 h-5 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+                '</svg>' +
+                '<span class="font-semibold">' + event.startTime + ' - ' + event.endTime + '</span>' +
+              '</div>' +
+              '<div class="flex items-center text-sm text-gray-700">' +
+                '<svg class="w-5 h-5 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>' +
+                '</svg>' +
+                '<span class="font-semibold">' + event.location + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="mb-4">' +
+              '<div class="flex justify-between items-center mb-2">' +
+                '<span class="text-xs font-bold text-gray-600 uppercase">Capacity</span>' +
+                '<span class="text-sm font-bold ' + capacityClass + '">' + event.registered + ' / ' + event.capacity + '</span>' +
+              '</div>' +
+              '<div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">' +
+                '<div class="progress-bar h-full rounded-full ' + 
+                  (fillPercentage >= 100 ? 'bg-red-500' :
+                   fillPercentage >= 80 ? 'bg-yellow-500' :
+                   fillPercentage >= 50 ? 'bg-blue-500' : 'bg-green-500') + 
+                '" style="width: ' + Math.min(fillPercentage, 100) + '%"></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="space-y-2">' +
+              '<button onclick="registerForEvent(\'' + event.id + '\')" class="w-full ' + (isFull ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700') + ' text-white px-4 py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2" ' + (isFull ? 'disabled' : '') + '>' +
+                '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>' +
+                '</svg>' +
+                (isFull ? 'Event Full' : 'Register Now') +
+              '</button>' +
+              '<div class="grid grid-cols-3 gap-2">' +
+                '<button onclick="viewAttendees(\'' + event.id + '\')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1">' +
+                  '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>' +
+                  '</svg>' +
+                  eventRegistrations.length +
+                '</button>' +
+                '<button onclick="editEvent(\'' + event.id + '\')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-bold transition-all">' +
+                  'Edit' +
+                '</button>' +
+                '<button onclick="deleteEvent(\'' + event.id + '\')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-xs font-bold transition-all">' +
+                  'Delete' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    let registeringEventId = null;
+
+    function registerForEvent(eventId) {
+      const event = getEvents().find(e => e.id === eventId);
+      if (!event) return;
+
+      if (event.registered >= event.capacity) {
+        showToast('This event is already full!', 'error');
+        return;
+      }
+
+      registeringEventId = eventId;
+      
+      const eventDate = new Date(event.date);
+      const formattedDate = eventDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long', 
+        day: 'numeric', 
+        year: 'numeric' 
+      });
+
+      document.getElementById('registrationModalTitle').textContent = 'Register for Event';
+      document.getElementById('regEventTitle').textContent = event.title;
+      document.getElementById('regEventDate').textContent = '📅 ' + formattedDate + ' at ' + event.startTime;
+      document.getElementById('regEventLocation').textContent = '📍 ' + event.location;
+      
+      document.getElementById('registrationForm').reset();
+      document.getElementById('registrationModal').classList.remove('hidden');
+      document.getElementById('registrationModal').classList.add('flex');
+    }
+
+    function viewAttendees(eventId) {
+      const event = getEvents().find(e => e.id === eventId);
+      const registrations = getRegistrations().filter(r => r.eventId === eventId);
+      
+      document.getElementById('attendeesModalTitle').textContent = 'Attendees - ' + event.title;
+      
+      const list = document.getElementById('attendeesList');
+      
+      if (registrations.length === 0) {
+        list.innerHTML = '<div class="text-center py-12">' +
+          '<svg class="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>' +
+          '</svg>' +
+          '<p class="text-gray-500 text-lg">No registrations yet</p>' +
+        '</div>';
+      } else {
+        const ticketNames = { 'general': 'General', 'vip': 'VIP', 'student': 'Student' };
+        const ticketColors = { 'general': 'bg-blue-100 text-blue-700', 'vip': 'bg-purple-100 text-purple-700', 'student': 'bg-green-100 text-green-700' };
+        
+        list.innerHTML = '<div class="mb-4 p-4 bg-blue-50 rounded-lg">' +
+          '<p class="text-sm font-semibold text-blue-800">Total Attendees: ' + registrations.length + ' / ' + event.capacity + '</p>' +
+        '</div>' +
+        '<div class="overflow-x-auto">' +
+          '<table class="w-full">' +
+            '<thead class="bg-gradient-to-r from-gray-50 to-gray-100">' +
+              '<tr>' +
+                '<th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Name</th>' +
+                '<th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>' +
+                '<th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Phone</th>' +
+                '<th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Ticket Type</th>' +
+                '<th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Ticket #</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody class="divide-y divide-gray-200">' +
+              registrations.map((reg, index) => 
+                '<tr class="hover:bg-gray-50 transition-colors ' + (index % 2 === 0 ? 'bg-white' : 'bg-gray-50') + '">' +
+                  '<td class="px-6 py-4 text-sm font-semibold text-gray-800">' + reg.attendeeName + '</td>' +
+                  '<td class="px-6 py-4 text-sm text-gray-600">' + reg.attendeeEmail + '</td>' +
+                  '<td class="px-6 py-4 text-sm text-gray-600">' + reg.attendeePhone + '</td>' +
+                  '<td class="px-6 py-4 text-sm">' +
+                    '<span class="px-3 py-1 ' + ticketColors[reg.ticketType] + ' rounded-full text-xs font-bold">' +
+                      ticketNames[reg.ticketType] +
+                    '</span>' +
+                  '</td>' +
+                  '<td class="px-6 py-4 text-sm font-mono text-gray-600">' + reg.ticketNumber + '</td>' +
+                '</tr>'
+              ).join('') +
+            '</tbody>' +
+          '</table>' +
+        '</div>';
+      }
+      
+      document.getElementById('attendeesModal').classList.remove('hidden');
+      document.getElementById('attendeesModal').classList.add('flex');
+    }
+
+    function editEvent(eventId) {
+      const event = getEvents().find(e => e.id === eventId);
+      if (!event) return;
+
+      editingEventId = eventId;
+      document.getElementById('modalTitle').textContent = 'Edit Event';
+      
+      document.getElementById('eventTitle').value = event.title;
+      document.getElementById('eventDescription').value = event.description;
+      document.getElementById('eventDate').value = event.date;
+      document.getElementById('eventStartTime').value = event.startTime;
+      document.getElementById('eventEndTime').value = event.endTime;
+      document.getElementById('eventLocation').value = event.location;
+      document.getElementById('eventCapacity').value = event.capacity;
+      document.getElementById('eventCategory').value = event.category;
+
+      document.getElementById('eventModal').classList.remove('hidden');
+      document.getElementById('eventModal').classList.add('flex');
+    }
+
+    function deleteEvent(eventId) {
+      const registrations = getRegistrations().filter(r => r.eventId === eventId);
+      
+      if (registrations.length > 0) {
+        showToast('Cannot delete event with ' + registrations.length + ' registered attendees', 'error');
+        return;
+      }
+
+      allRecords = allRecords.filter(r => r.id !== eventId);
+      saveData();
+      showToast('Event deleted successfully!', 'success');
+    }
+
+    function showToast(message, type) {
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(function() { toast.remove(); }, 3000);
+    }
+
+    // Event Listeners
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+      loadData();
+      showToast('Dashboard refreshed!', 'success');
+    });
+
+    document.getElementById('createEventBtn').addEventListener('click', function() {
+      editingEventId = null;
+      document.getElementById('modalTitle').textContent = 'Create New Event';
+      document.getElementById('eventForm').reset();
+      document.getElementById('eventModal').classList.remove('hidden');
+      document.getElementById('eventModal').classList.add('flex');
+    });
+
+    document.getElementById('closeModal').addEventListener('click', function() {
+      document.getElementById('eventModal').classList.add('hidden');
+      document.getElementById('eventModal').classList.remove('flex');
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', function() {
+      document.getElementById('eventModal').classList.add('hidden');
+      document.getElementById('eventModal').classList.remove('flex');
+    });
+
+    document.getElementById('closeAttendeesModal').addEventListener('click', function() {
+      document.getElementById('attendeesModal').classList.add('hidden');
+      document.getElementById('attendeesModal').classList.remove('flex');
+    });
+
+    document.getElementById('closeRegistrationModal').addEventListener('click', function() {
+      document.getElementById('registrationModal').classList.add('hidden');
+      document.getElementById('registrationModal').classList.remove('flex');
+    });
+
+    document.getElementById('cancelRegistrationBtn').addEventListener('click', function() {
+      document.getElementById('registrationModal').classList.add('hidden');
+      document.getElementById('registrationModal').classList.remove('flex');
+    });
+
+    document.getElementById('searchEvents').addEventListener('input', function() {
+      renderDashboard();
+    });
+
+    document.getElementById('filterCategory').addEventListener('change', function() {
+      renderDashboard();
+    });
+
+    document.getElementById('registrationForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById('submitRegistrationBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="loading-spinner mx-auto"></div>';
+
+      setTimeout(function() {
+        const event = getEvents().find(e => e.id === registeringEventId);
+        
+        if (!event || event.registered >= event.capacity) {
+          showToast('Registration failed: Event is full', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Complete Registration';
+          return;
+        }
+
+        const ticketNumber = 'TKT-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+
+        const registrationData = {
+          type: 'registration',
+          id: 'reg_' + Date.now(),
+          eventId: registeringEventId,
+          attendeeName: document.getElementById('attendeeName').value,
+          attendeeEmail: document.getElementById('attendeeEmail').value,
+          attendeePhone: document.getElementById('attendeePhone').value,
+          ticketType: document.getElementById('ticketType').value,
+          ticketNumber: ticketNumber,
+          registeredAt: new Date().toISOString()
+        };
+
+        allRecords.push(registrationData);
+
+        const eventIndex = allRecords.findIndex(r => r.id === registeringEventId);
+        if (eventIndex !== -1) {
+          allRecords[eventIndex].registered = (allRecords[eventIndex].registered || 0) + 1;
+        }
+
+        saveData();
+        showToast('Registration successful! Ticket: ' + ticketNumber, 'success');
+        
+        document.getElementById('registrationModal').classList.add('hidden');
+        document.getElementById('registrationModal').classList.remove('flex');
+        document.getElementById('registrationForm').reset();
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Complete Registration';
+      }, 800);
+    });
+
+    document.getElementById('eventForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="loading-spinner mx-auto"></div>';
+
+      setTimeout(function() {
+        const eventData = {
+          type: 'event',
+          id: editingEventId || 'event_' + Date.now(),
+          title: document.getElementById('eventTitle').value,
+          description: document.getElementById('eventDescription').value,
+          date: document.getElementById('eventDate').value,
+          startTime: document.getElementById('eventStartTime').value,
+          endTime: document.getElementById('eventEndTime').value,
+          location: document.getElementById('eventLocation').value,
+          capacity: parseInt(document.getElementById('eventCapacity').value),
+          category: document.getElementById('eventCategory').value,
+          registered: 0,
+          createdAt: new Date().toISOString()
+        };
+
+        if (editingEventId) {
+          const index = allRecords.findIndex(r => r.id === editingEventId);
+          if (index !== -1) {
+            eventData.registered = allRecords[index].registered;
+            allRecords[index] = eventData;
+          }
+        } else {
+          allRecords.push(eventData);
+        }
+
+        saveData();
+        showToast(editingEventId ? 'Event updated successfully!' : 'Event created successfully!', 'success');
+        document.getElementById('eventModal').classList.add('hidden');
+        document.getElementById('eventModal').classList.remove('flex');
+        document.getElementById('eventForm').reset();
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Event';
+      }, 500);
+    });
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      loadData();
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a321c77876edab3',t:'MTc2MzkxNjA1Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
